@@ -35,20 +35,37 @@ class ToDoItemController extends Controller
         return response()->json($toDoItem);
     }
 
-    public function update(Request $request, ToDoItem $toDoItem)
+    public function update(Request $request, $id)
     {
-        $this->authorize('update', $toDoItem);
+        $toDoItem = ToDoItem::findOrFail($id);
+
+        if ($toDoItem->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized action.');
+        }
 
         $data = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'is_done' => 'boolean',
             'category_id' => 'nullable|exists:categories,id',
+            'is_done' => 'boolean',
         ]);
 
         $toDoItem->update($data);
 
-        return response()->json($toDoItem, 200);
+        return redirect()->route('todos.index')->with('success', 'ToDo item updated successfully!');
+    }
+
+
+    public function edit($id)
+    {
+        $toDoItem = ToDoItem::findOrFail($id);
+
+        // Ensure the user owns the item
+        if ($toDoItem->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        return view('todo.edit', compact('toDoItem'));
     }
 
     public function destroy($id)
