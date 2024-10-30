@@ -45,4 +45,14 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    public function toDoItems()
+    {
+        return $this->hasMany(ToDoItem::class);
+    }
+
+    public function sharedItems()
+    {
+        return $this->hasMany(SharedItem::class);
+    }
 }
