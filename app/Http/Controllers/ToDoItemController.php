@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\ToDoItem;
 use Illuminate\Http\Request;
 
@@ -10,9 +11,32 @@ class ToDoItemController extends Controller
 {
     public function index(Request $request)
     {
-        $toDoItems = ToDoItem::where('user_id', auth()->id())->paginate(10);
-        return view('todo.index', compact('toDoItems'));
+        $categories = Category::all();
+        $categoryId = $request->input('category');
+
+        // Retrieve active ToDo items with optional category filter
+        $todos = ToDoItem::with('category')
+            ->when($categoryId, function ($query, $categoryId) {
+                return $query->where('category_id', $categoryId);
+            })
+            ->whereNull('deleted_at') // Exclude soft-deleted items
+            ->where('user_id', auth()->id())
+            ->get();
+
+        // Retrieve soft-deleted ToDo items
+        $deletedTodos = ToDoItem::onlyTrashed()
+            ->where('user_id', auth()->id())
+            ->when($categoryId, function ($query, $categoryId) {
+                return $query->where('category_id', $categoryId);
+            })
+            ->with('category')
+            ->get();
+
+        return view('todo.index', compact('todos', 'categories', 'deletedTodos'));
     }
+
+
+
 
     public function store(Request $request)
     {
@@ -70,7 +94,7 @@ class ToDoItemController extends Controller
 
     public function destroy($id)
     {
-        $toDoItem = ToDoItem::find($id);
+        $toDoItem = ToDoItem::findOrFail($id);
 
         if ($toDoItem->user_id !== auth()->id()) {
             abort(403, 'Unauthorized action.');
@@ -78,16 +102,36 @@ class ToDoItemController extends Controller
 
         $toDoItem->delete();
 
-        return redirect()->route('todos.index')->with('success', 'ToDo item deleted successfully!');
+        return redirect()->route('todos.index')->with('success', 'ToDo item deleted successfully! You can restore it from the deleted items section.');
     }
+
 
     public function restore($id)
     {
-        $toDoItem = ToDoItem::onlyTrashed()->findOrFail($id);
-        $this->authorize('restore', $toDoItem);
+        $toDoItem = ToDoItem::withTrashed()->findOrFail($id);
+
+        // Ensure the authenticated user owns the ToDo item
+        if ($toDoItem->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized action.');
+        }
 
         $toDoItem->restore();
 
-        return response()->json(['message' => 'Item restored'], 200);
+        return redirect()->route('todos.index')->with('success', 'ToDo item restored successfully!');
     }
+
+
+    public function toggleComplete($id)
+    {
+        // Find the ToDo item by its ID
+        $todo = ToDoItem::findOrFail($id);
+
+        // Toggle the 'is_done' attribute
+        $todo->is_done = !$todo->is_done;
+        $todo->save();
+
+        // Redirect back with a success message
+        return redirect()->route('todos.index')->with('success', 'ToDo item updated successfully!');
+    }
+
 }
