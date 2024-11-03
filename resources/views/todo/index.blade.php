@@ -38,71 +38,77 @@
     </select>
 </form>
 
+<br><br><br>
+
 <!-- Active ToDo Items Table -->
-<h2>Active ToDo Items</h2>
-<table border="1">
-    <thead>
-    <tr>
-        <th>Complete</th>
-        <th>Task Name</th>
-        <th>Category</th>
-        <th>Description</th>
-        <th>Shared With</th>
-        <th>Actions</th>
-    </tr>
-    </thead>
-    <tbody>
-    @foreach ($todos as $todo)
+<div>
+    <h2>Active ToDo Items</h2>
+    <table>
+        <thead>
         <tr>
-            <td>
-                <form action="{{ route('todos.toggleComplete', $todo->id) }}" method="POST">
-                    @csrf
-                    @method('PATCH')
-                    <input type="checkbox" onclick="this.form.submit()" {{ $todo->is_done ? 'checked' : '' }}>
-                </form>
-            </td>
-            <td>{{ $todo->name }}</td>
-            <td>{{ $todo->category->name ?? 'Uncategorized' }}</td>
-            <td>{{ $todo->description }}</td>
-            <td>
-                @foreach ($todo->sharedUsers as $user)
-                    {{ $user->email }}<br>
-                @endforeach
-            </td>
-            <td>
-                <a href="{{ route('todos.edit', $todo->id) }}">Edit</a> |
-                <form action="{{ route('todos.destroy', $todo->id) }}" method="POST" style="display:inline;">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit">Delete</button>
-                </form>
-            </td>
+            <th>Complete</th>
+            <th>Task Name</th>
+            <th>Category</th>
+            <th>Description</th>
+            <th>Shared With</th>
+            <th>Actions</th>
         </tr>
-    @endforeach
-    <!-- Add new ToDo item row -->
-    <tr>
-        <td colspan="7">
-            <form action="{{ route('todos.store') }}" method="POST">
-                @csrf
-                <input type="text" name="name" placeholder="New Task" required>
+        </thead>
+        <tbody>
+        @foreach ($todos as $todo)
+            <tr>
+                <td><input type="checkbox" disabled {{ $todo->is_done ? 'checked' : '' }}></td>
+                <td>{{ $todo->name }}</td>
+                <td>{{ $todo->category->name ?? 'Uncategorized' }}</td>
+                <td>{{ $todo->description }}</td>
+                <td>
+                    @foreach ($todo->sharedUsers as $user)
+                        {{ $user->id }}@if (!$loop->last), @endif
+                    @endforeach
+                </td>
+                <td>
+                    <a href="{{ route('todos.edit', $todo->id) }}">Edit</a> |
+                    <form action="{{ route('todos.destroy', $todo->id) }}" method="POST" style="display:inline;">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        @endforeach
+        </tbody>
+    </table>
+
+    <!-- Pagination Links -->
+    <div>
+        {{ $todos->links() }}
+    </div>
+</div>
+
+<!-- New ToDo Item Form -->
+<h2>Add New ToDo Item</h2>
+<table>
+    <form action="{{ route('todos.store') }}" method="POST">
+        @csrf
+        <tr>
+            <td><input type="checkbox" name="is_done" value="1"></td>
+            <td><input type="text" name="name" placeholder="New Task"></td>
+            <td>
                 <select name="category_id">
                     <option value="">Select Category</option>
                     @foreach ($categories as $category)
                         <option value="{{ $category->id }}">{{ $category->name }}</option>
                     @endforeach
                 </select>
-                <input type="text" name="description" placeholder="Description">
-
-                <input type="number" name="share_with_user_id" placeholder="User ID to share with">
-
-                <button type="submit">Add ToDo</button>
-            </form>
-        </td>
-    </tr>
-
-
-    </tbody>
+            </td>
+            <td><input type="text" name="description" placeholder="Description"></td>
+            <td><input type="text" name="shared_user_id" placeholder="User ID to share with"></td>
+            <td><button type="submit">Add ToDo</button></td>
+        </tr>
+    </form>
 </table>
+
+<br><br><br>
 
 <!-- Deleted ToDo Items Table -->
 <h2>Deleted ToDo Items</h2>

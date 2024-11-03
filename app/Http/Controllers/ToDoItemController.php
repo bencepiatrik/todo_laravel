@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\ToDoItem;
 use Illuminate\Http\Request;
@@ -24,7 +23,7 @@ class ToDoItemController extends Controller
             })
             ->whereNull('deleted_at')
             ->where('user_id', auth()->id())
-            ->get();
+            ->paginate(5); // Display 5 items per page
 
         $deletedTodos = ToDoItem::onlyTrashed()
             ->where('user_id', auth()->id())
@@ -39,9 +38,6 @@ class ToDoItemController extends Controller
 
         return view('todo.index', compact('todos', 'categories', 'deletedTodos'));
     }
-
-
-
 
 
     public function store(Request $request)
