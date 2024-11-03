@@ -9,12 +9,13 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up(): void
+    public function up()
     {
         Schema::create('shared_items', function (Blueprint $table) {
-            $table->increments('id');
-            $table->unsignedInteger('to_do_item_id');
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->id();
+            $table->unsignedBigInteger('to_do_item_id');
+            $table->unsignedBigInteger('owner_id');
+            $table->unsignedBigInteger('shared_with_id');
             $table->timestamps();
         });
     }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\SharedItem;
 use App\Models\ToDoItem;
 use Illuminate\Http\Request;
 
@@ -14,7 +15,7 @@ class ToDoItemController extends Controller
         $categoryId = $request->input('category');
         $completed = $request->input('completed');
 
-        $todos = ToDoItem::with('category')
+        $userTodosQuery = ToDoItem::with('category')
             ->when($categoryId, function ($query, $categoryId) {
                 return $query->where('category_id', $categoryId);
             })
@@ -22,8 +23,21 @@ class ToDoItemController extends Controller
                 return $query->where('is_done', $completed);
             })
             ->whereNull('deleted_at')
-            ->where('user_id', auth()->id())
-            ->paginate(5); // Display 5 items per page
+            ->where('user_id', auth()->id());
+
+        $sharedTodosQuery = ToDoItem::with('category')
+            ->whereHas('sharedItems', function ($query) {
+                $query->where('shared_with_id', auth()->id());
+            })
+            ->when($categoryId, function ($query, $categoryId) {
+                return $query->where('category_id', $categoryId);
+            })
+            ->when(isset($completed), function ($query) use ($completed) {
+                return $query->where('is_done', $completed);
+            })
+            ->whereNull('deleted_at');
+
+        $todos = $userTodosQuery->union($sharedTodosQuery)->paginate(5);
 
         $deletedTodos = ToDoItem::onlyTrashed()
             ->where('user_id', auth()->id())
@@ -44,23 +58,29 @@ class ToDoItemController extends Controller
     {
         $data = $request->validate([
             'name' => 'required|string|max:255',
-            'category_id' => 'nullable|exists:categories,id',
             'description' => 'nullable|string',
-            'share_with_user_id' => 'nullable|integer|exists:users,id',
+            'category_id' => 'nullable|integer|exists:categories,id',
+            'shared_with' => 'nullable|integer|exists:users,id',
         ]);
 
         $todo = ToDoItem::create([
             'name' => $data['name'],
-            'category_id' => $data['category_id'],
-            'description' => $data['description'],
+            'description' => $data['description'] ?? '',
+            'category_id' => $data['category_id'] ?? null,
             'user_id' => auth()->id(),
         ]);
 
-        if (!empty($data['share_with_user_id'])) {
-            $todo->sharedUsers()->attach($data['share_with_user_id']);
+        if (isset($data['shared_with'])) {
+            SharedItem::create([
+                'to_do_item_id' => $todo->id,
+                'owner_id' => auth()->id(),
+                'shared_with_id' => $data['shared_with'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
         }
 
-        return redirect()->route('todos.index')->with('success', 'ToDo item created and shared successfully!');
+        return redirect()->route('todos.index')->with('success', 'ToDo item created successfully!');
     }
 
 
@@ -143,26 +163,25 @@ class ToDoItemController extends Controller
 
     public function share(Request $request, $id)
     {
-        $toDoItem = ToDoItem::findOrFail($id);
-        $email = $request->input('email');
+        $data = $request->validate(['shared_with' => 'required|integer|exists:users,id']);
 
-        $user = User::where('email', $email)->first();
+        SharedItem::create([
+            'to_do_item_id' => $id,
+            'owner_id' => auth()->id(),
+            'shared_with_id' => $data['shared_with'],
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
-        if ($user && $user->id !== auth()->id()) {
-            $toDoItem->sharedWith()->attach($user->id);
-
-            return redirect()->route('todos.index')->with('success', 'ToDo item shared successfully!');
-        }
-
-        return redirect()->route('todos.index')->with('error', 'User not found or invalid share.');
+        return redirect()->route('todos.index')->with('success', 'ToDo item shared successfully!');
     }
 
     public function unshare($id, $userId)
     {
-        $toDoItem = ToDoItem::findOrFail($id);
-        $toDoItem->sharedWith()->detach($userId);
+        SharedItem::where('to_do_item_id', $id)
+            ->where('shared_with_id', $userId)
+            ->delete();
 
-        return redirect()->route('todos.index')->with('success', 'Sharing canceled successfully!');
+        return redirect()->route('todos.index')->with('success', 'ToDo item unshared successfully!');
     }
-
 }
