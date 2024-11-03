@@ -8,9 +8,15 @@
 <body>
 
 <!-- Navbar -->
-<nav style="background-color: #f8f9fa; padding: 10px;">
-    <a href="{{ route('todos.index') }}" style="margin-right: 10px;">Home</a>
-    <a href="{{ route('categories.index') }}">Categories</a>
+<nav>
+    <a href="{{ route('todos.index') }}">Home</a> |
+    <a href="{{ route('categories.index') }}">Categories</a> |
+    <!-- Logout Link -->
+    <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">Logout</a>
+    <!-- Logout Form (Hidden) -->
+    <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
+        @csrf
+    </form>
 </nav>
 
 <h1>ToDo List</h1>
