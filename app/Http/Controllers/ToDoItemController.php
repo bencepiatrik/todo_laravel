@@ -13,27 +13,35 @@ class ToDoItemController extends Controller
     {
         $categories = Category::all();
         $categoryId = $request->input('category');
+        $completed = $request->input('completed');
 
-        // Retrieve active ToDo items with optional category filter
+        // Retrieve active ToDo items with optional category and completion filters
         $todos = ToDoItem::with('category')
             ->when($categoryId, function ($query, $categoryId) {
                 return $query->where('category_id', $categoryId);
+            })
+            ->when(isset($completed), function ($query) use ($completed) {
+                return $query->where('is_done', $completed);
             })
             ->whereNull('deleted_at') // Exclude soft-deleted items
             ->where('user_id', auth()->id())
             ->get();
 
-        // Retrieve soft-deleted ToDo items
+        // Retrieve soft-deleted ToDo items with the same filters
         $deletedTodos = ToDoItem::onlyTrashed()
             ->where('user_id', auth()->id())
             ->when($categoryId, function ($query, $categoryId) {
                 return $query->where('category_id', $categoryId);
+            })
+            ->when(isset($completed), function ($query) use ($completed) {
+                return $query->where('is_done', $completed);
             })
             ->with('category')
             ->get();
 
         return view('todo.index', compact('todos', 'categories', 'deletedTodos'));
     }
+
 
 
 
