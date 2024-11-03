@@ -29,8 +29,15 @@ class ToDoItem extends Model
         return $this->belongsTo(Category::class);
     }
 
+    public function sharedWith()
+    {
+        return $this->belongsToMany(User::class, 'shared_items');
+    }
+
     public function sharedUsers()
     {
-        return $this->hasMany(SharedItem::class);
+        return $this->belongsToMany(User::class, 'shared_items', 'to_do_item_id', 'user_id');
     }
+
+
 }

@@ -40,57 +40,67 @@
 
 <!-- Active ToDo Items Table -->
 <h2>Active ToDo Items</h2>
-<table border="1" cellpadding="10" cellspacing="0" style="width: 100%; border-collapse: collapse;">
+<table border="1">
     <thead>
     <tr>
         <th>Complete</th>
         <th>Task Name</th>
         <th>Category</th>
         <th>Description</th>
+        <th>Shared With</th>
         <th>Actions</th>
     </tr>
     </thead>
     <tbody>
-    @foreach($todos as $todo)
+    @foreach ($todos as $todo)
         <tr>
             <td>
-                <form action="{{ route('todos.toggleComplete', $todo->id) }}" method="POST" style="display: inline;">
+                <form action="{{ route('todos.toggleComplete', $todo->id) }}" method="POST">
                     @csrf
                     @method('PATCH')
-                    <input type="checkbox" onchange="this.form.submit()" {{ $todo->is_done ? 'checked' : '' }}>
+                    <input type="checkbox" onclick="this.form.submit()" {{ $todo->is_done ? 'checked' : '' }}>
                 </form>
             </td>
             <td>{{ $todo->name }}</td>
-            <td>{{ $todo->category ? $todo->category->name : 'No Category' }}</td>
+            <td>{{ $todo->category->name ?? 'Uncategorized' }}</td>
             <td>{{ $todo->description }}</td>
             <td>
-                <a href="{{ route('todos.edit', $todo->id) }}" style="margin-right: 10px;">Edit</a>
+                @foreach ($todo->sharedUsers as $user)
+                    {{ $user->email }}<br>
+                @endforeach
+            </td>
+            <td>
+                <a href="{{ route('todos.edit', $todo->id) }}">Edit</a> |
                 <form action="{{ route('todos.destroy', $todo->id) }}" method="POST" style="display:inline;">
                     @csrf
                     @method('DELETE')
-                    <button type="submit" onclick="return confirm('Are you sure you want to delete this item?');">Delete</button>
+                    <button type="submit">Delete</button>
                 </form>
             </td>
         </tr>
     @endforeach
-    <!-- Add New ToDo Item Row -->
+    <!-- Add new ToDo item row -->
     <tr>
-        <form action="{{ route('todos.store') }}" method="POST">
-            @csrf
-            <td colspan="1"></td> <!-- Empty cell for the 'Complete' column -->
-            <td><input type="text" name="name" placeholder="New Task"></td>
-            <td>
+        <td colspan="7">
+            <form action="{{ route('todos.store') }}" method="POST">
+                @csrf
+                <input type="text" name="name" placeholder="New Task" required>
                 <select name="category_id">
                     <option value="">Select Category</option>
-                    @foreach($categories as $category)
+                    @foreach ($categories as $category)
                         <option value="{{ $category->id }}">{{ $category->name }}</option>
                     @endforeach
                 </select>
-            </td>
-            <td><input type="text" name="description" placeholder="Description"></td>
-            <td><button type="submit">Add ToDo</button></td>
-        </form>
+                <input type="text" name="description" placeholder="Description">
+
+                <input type="number" name="share_with_user_id" placeholder="User ID to share with">
+
+                <button type="submit">Add ToDo</button>
+            </form>
+        </td>
     </tr>
+
+
     </tbody>
 </table>
 

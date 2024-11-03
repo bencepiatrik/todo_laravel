@@ -15,7 +15,6 @@ class ToDoItemController extends Controller
         $categoryId = $request->input('category');
         $completed = $request->input('completed');
 
-        // Retrieve active ToDo items with optional category and completion filters
         $todos = ToDoItem::with('category')
             ->when($categoryId, function ($query, $categoryId) {
                 return $query->where('category_id', $categoryId);
@@ -23,11 +22,10 @@ class ToDoItemController extends Controller
             ->when(isset($completed), function ($query) use ($completed) {
                 return $query->where('is_done', $completed);
             })
-            ->whereNull('deleted_at') // Exclude soft-deleted items
+            ->whereNull('deleted_at')
             ->where('user_id', auth()->id())
             ->get();
 
-        // Retrieve soft-deleted ToDo items with the same filters
         $deletedTodos = ToDoItem::onlyTrashed()
             ->where('user_id', auth()->id())
             ->when($categoryId, function ($query, $categoryId) {
@@ -50,16 +48,25 @@ class ToDoItemController extends Controller
     {
         $data = $request->validate([
             'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
             'category_id' => 'nullable|exists:categories,id',
+            'description' => 'nullable|string',
+            'share_with_user_id' => 'nullable|integer|exists:users,id',
         ]);
 
-        $data['user_id'] = auth()->id();
+        $todo = ToDoItem::create([
+            'name' => $data['name'],
+            'category_id' => $data['category_id'],
+            'description' => $data['description'],
+            'user_id' => auth()->id(),
+        ]);
 
-        ToDoItem::create($data);
+        if (!empty($data['share_with_user_id'])) {
+            $todo->sharedUsers()->attach($data['share_with_user_id']);
+        }
 
-        return redirect()->route('todos.index')->with('success', 'ToDo item added successfully!');
+        return redirect()->route('todos.index')->with('success', 'ToDo item created and shared successfully!');
     }
+
 
     public function show(ToDoItem $toDoItem)
     {
@@ -69,36 +76,37 @@ class ToDoItemController extends Controller
 
     public function update(Request $request, $id)
     {
-        $toDoItem = ToDoItem::findOrFail($id);
-
-        if ($toDoItem->user_id !== auth()->id()) {
-            abort(403, 'Unauthorized action.');
-        }
-
         $data = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'category_id' => 'nullable|exists:categories,id',
-            'is_done' => 'boolean',
+            'is_done' => 'nullable|boolean',
+            'shared_with' => 'nullable|exists:users,id',
         ]);
 
-        $toDoItem->update($data);
+        $todoItem = ToDoItem::findOrFail($id);
+        $todoItem->update($data);
+
+        if (!empty($data['shared_with'])) {
+            $todoItem->sharedUsers()->detach();
+            $todoItem->sharedUsers()->attach($data['shared_with']);
+        } else {
+            $todoItem->sharedUsers()->detach();
+        }
 
         return redirect()->route('todos.index')->with('success', 'ToDo item updated successfully!');
     }
 
 
+
     public function edit($id)
     {
-        $toDoItem = ToDoItem::findOrFail($id);
-
-        // Ensure the user owns the item
-        if ($toDoItem->user_id !== auth()->id()) {
-            abort(403, 'Unauthorized action.');
-        }
-
-        return view('todo.edit', compact('toDoItem'));
+        $todoItem = ToDoItem::with('category', 'sharedUsers')->findOrFail($id);
+        $sharedUserId = $todoItem->sharedUsers()->pluck('user_id')->first();
+        $categories = Category::all();
+        return view('todo.edit', compact('todoItem', 'categories', 'sharedUserId'));
     }
+
 
     public function destroy($id)
     {
@@ -118,7 +126,6 @@ class ToDoItemController extends Controller
     {
         $toDoItem = ToDoItem::withTrashed()->findOrFail($id);
 
-        // Ensure the authenticated user owns the ToDo item
         if ($toDoItem->user_id !== auth()->id()) {
             abort(403, 'Unauthorized action.');
         }
@@ -131,15 +138,35 @@ class ToDoItemController extends Controller
 
     public function toggleComplete($id)
     {
-        // Find the ToDo item by its ID
         $todo = ToDoItem::findOrFail($id);
-
-        // Toggle the 'is_done' attribute
         $todo->is_done = !$todo->is_done;
         $todo->save();
 
-        // Redirect back with a success message
         return redirect()->route('todos.index')->with('success', 'ToDo item updated successfully!');
+    }
+
+    public function share(Request $request, $id)
+    {
+        $toDoItem = ToDoItem::findOrFail($id);
+        $email = $request->input('email');
+
+        $user = User::where('email', $email)->first();
+
+        if ($user && $user->id !== auth()->id()) {
+            $toDoItem->sharedWith()->attach($user->id);
+
+            return redirect()->route('todos.index')->with('success', 'ToDo item shared successfully!');
+        }
+
+        return redirect()->route('todos.index')->with('error', 'User not found or invalid share.');
+    }
+
+    public function unshare($id, $userId)
+    {
+        $toDoItem = ToDoItem::findOrFail($id);
+        $toDoItem->sharedWith()->detach($userId);
+
+        return redirect()->route('todos.index')->with('success', 'Sharing canceled successfully!');
     }
 
 }

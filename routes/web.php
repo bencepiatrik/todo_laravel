@@ -30,6 +30,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/todos/{id}/destroy', [ToDoItemController::class, 'destroy'])->name('todos.destroy');
     Route::patch('/todos/{id}/restore', [ToDoItemController::class, 'restore'])->name('todos.restore');
 
+    Route::post('/todos/{id}/share', [ToDoItemController::class, 'share'])->name('todos.share');
+    Route::delete('/todos/{id}/unshare/{userId}', [ToDoItemController::class, 'unshare'])->name('todos.unshare');
 });
 
 require __DIR__.'/auth.php';
